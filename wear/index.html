@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReWear - Community Clothing Exchange</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                        'primary-dark': '#4A49CC'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .item-image {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            position: relative;
+        }
+        .item-image::before {
+            content: '👕';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2rem;
+            opacity: 0.8;
+        }
+        .carousel-item {
+            transition: transform 0.5s ease-in-out;
+        }
+    </style>
+</head>
+<body class="h-full bg-white dark:bg-gray-900 text-gray-900 dark:text-white" x-data="reWearApp()">
+    <!-- Navigation -->
+    <nav class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <h1 class="text-2xl font-bold text-primary cursor-pointer" @click="currentView = 'landing'">
+                        ReWear
+                    </h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <template x-if="!isLoggedIn">
+                        <div class="flex space-x-2">
+                            <button @click="currentView = 'login'" 
+                                    class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-primary">
+                                Login
+                            </button>
+                            <button @click="currentView = 'signup'" 
+                                    class="px-4 py-2 text-sm font-medium bg-primary text-white rounded-lg hover:bg-primary-dark">
+                                Sign Up
+                            </button>
+                        </div>
+                    </template>
+                    <template x-if="isLoggedIn">
+                        <div class="flex items-center space-x-4">
+                            <button @click="currentView = 'browse'" 
+                                    class="text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-primary">
+                                Browse
+                            </button>
+                            <button @click="currentView = 'dashboard'" 
+                                    class="text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-primary">
+                                Dashboard
+                            </button>
+                            <div class="flex items-center space-x-2 px-3 py-1 bg-primary/10 rounded-full">
+                                <span class="text-sm font-medium">💎</span>
+                                <span class="text-sm font-bold text-primary" x-text="currentUser.points"></span>
+                            </div>
+                            <button @click="logout()" 
+                                    class="text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-red-600">
+                                Logout
+                            </button>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="min-h-screen">
+        <!-- Landing Page -->
+        <div x-show="currentView === 'landing'" class="relative">
+            <!-- Hero Section -->
+            <div class="bg-gradient-to-br from-primary to-purple-600 text-white">
+                <div class="max-w-7xl mx-auto px-4 py-20 text-center">
+                    <h1 class="text-5xl font-bold mb-6">Transform Your Wardrobe Sustainably</h1>
+                    <p class="text-xl mb-8 max-w-2xl mx-auto">Join ReWear's community clothing exchange. Swap unused garments, earn points, and reduce textile waste while discovering unique fashion pieces.</p>
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                        <button @click="isLoggedIn ? currentView = 'browse' : currentView = 'signup'" 
+                                class="px-8 py-3 bg-white text-primary font-semibold rounded-lg hover:bg-gray-100 transition">
+                            Start Swapping
+                        </button>
+                        <button @click="currentView = 'browse'" 
+                                class="px-8 py-3 border-2 border-white text-white font-semibold rounded-lg hover:bg-white hover:text-primary transition">
+                            Browse Items
+                        </button>
+                        <button @click="isLoggedIn ? showListItemModal = true : currentView = 'signup'" 
+                                class="px-8 py-3 border-2 border-white text-white font-semibold rounded-lg hover:bg-white hover:text-primary transition">
+                            List an Item
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Featured Items Carousel -->
+            <div class="max-w-7xl mx-auto px-4 py-16">
+                <h2 class="text-3xl font-bold text-center mb-12">Featured Items</h2>
+                <div class="relative overflow-hidden">
+                    <div class="flex transition-transform duration-500 ease-in-out" 
+                         :style="'transform: translateX(-' + (carouselIndex * 100) + '%)'">
+                        <template x-for="(chunk, index) in featuredChunks" :key="index">
+                            <div class="w-full flex-shrink-0 grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <template x-for="item in chunk" :key="item.id">
+                                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition" 
+                                         @click="viewItem(item.id)">
+                                        <div class="item-image h-48 w-full"></div>
+                                        <div class="p-4">
+                                            <h3 class="font-semibold mb-2" x-text="item.title"></h3>
+                                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-2" x-text="item.category"></p>
+                                            <p class="text-sm text-gray-500 dark:text-gray-500" x-text="'Size: ' + item.size"></p>
+                                            <div class="flex justify-between items-center mt-3">
+                                                <span class="text-primary font-semibold" x-text="item.points + ' points'"></span>
+                                                <span class="text-xs px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-full">Available</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                    <button @click="prevCarousel()" 
+                            class="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white dark:bg-gray-800 p-2 rounded-full shadow-lg hover:shadow-xl transition">
+                        ←
+                    </button>
+                    <button @click="nextCarousel()" 
+                            class="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white dark:bg-gray-800 p-2 rounded-full shadow-lg hover:shadow-xl transition">
+                        →
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Login Page -->
+        <div x-show="currentView === 'login'" class="max-w-md mx-auto px-4 py-16">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8">
+                <h2 class="text-2xl font-bold text-center mb-6">Welcome Back</h2>
+                <form @submit.prevent="login()">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">Email</label>
+                        <input type="email" x-model="loginForm.email" required
+                               class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-base">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium mb-2">Password</label>
+                        <input type="password" x-model="loginForm.password" required
+                               class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-base">
+                    </div>
+                    <button type="submit" 
+                            class="w-full py-2 bg-primary text-white font-semibold rounded-lg hover:bg-primary-dark transition">
+                        Login
+                    </button>
+                </form>
+                <p class="text-center mt-4 text-sm text-gray-600 dark:text-gray-400">
+                    Don't have an account? 
+                    <button @click="currentView = 'signup'" class="text-primary hover:underline">Sign up here</button>
+                </p>
+            </div>
+        </div>
+
+        <!-- Signup Page -->
+        <div x-show="currentView === 'signup'" class="max-w-md mx-auto px-4 py-16">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8">
+                <h2 class="text-2xl font-bold text-center mb-6">Join ReWear</h2>
+                <form @submit.prevent="signup()">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">Full Name</label>
+                        <input type="text" x-model="signupForm.name" required
+                               class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-base">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">Email</label>
+                        <input type="email" x-model="signupForm.email" required
+                               class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-base">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium mb-2">Password</label>
+                        <input type="password" x-model="signupForm.password" required
+                               class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-base">
+                    </div>
+                    <button type="submit" 
+                            class="w-full py-2 bg-primary text-white font-semibold rounded-lg hover:bg-primary-dark transition">
+                        Sign Up
+                    </button>
+                </form>
+                <p class="text-center mt-4 text-sm text-gray-600 dark:text-gray-400">
+                    Already have an account? 
+                    <button @click="currentView = 'login'" class="text-primary hover:underline">Login here</button>
+                </p>
+            </div>
+        </div>
+
+        <!-- Browse Items -->
+        <div x-show="currentView === 'browse'" class="max-w-7xl mx-auto px-4 py-8">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-3xl font-bold">Browse Items</h2>
+                <div class="flex space-x-4">
+                    <select x-model="filters.category" @change="applyFilters()"
+                            class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-base">
+                        <option value="">All Categories</option>
+                        <option value="Tops">Tops</option>
+                        <option value="Bottoms">Bottoms</option>
+                        <option value="Dresses">Dresses</option>
+                        <option value="Outerwear">Outerwear</option>
+                        <option value="Accessories">Accessories</option>
+                    </select>
+                    <select x-model="filters.size" @change="applyFilters()"
+                            class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-base">
+                        <option value="">All Sizes</option>
+                        <option value="XS">XS</option>
+                        <option value="S">S</option>
+                        <option value="M">M</option>
+                        <option value="L">L</option>
+                        <option value="XL">XL</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <template x-for="item in filteredItems" :key="item.id">
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition" 
+                         @click="viewItem(item.id)">
+                        <div class="item-image h-48 w-full"></div>
+                        <div class="p-4">
+                            <h3 class="font-semibold mb-2" x-text="item.title"></h3>
+                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-2" x-text="item.category"></p>
+                            <p class="text-sm text-gray-500 dark:text-gray-500" x-text="'Size: ' + item.size"></p>
+                            <div class="flex justify-between items-center mt-3">
+                                <span class="text-primary font-semibold" x-text="item.points + ' points'"></span>
+                                <span class="text-xs px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-full" 
+                                      x-text="item.status"></span>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Dashboard -->
+        <div x-show="currentView === 'dashboard'" x-data="{activeTab: 'profile'}" class="max-w-7xl mx-auto px-4 py-8">
+            <h2 class="text-3xl font-bold mb-6">Dashboard</h2>
+            
+            <!-- Tabs -->
+            <div class="border-b border-gray-200 dark:border-gray-700 mb-6">
+                <nav class="flex space-x-8">
+                    <button @click="activeTab = 'profile'" 
+                            :class="activeTab === 'profile' ? 'border-primary text-primary' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
+                            class="py-2 px-1 border-b-2 font-medium text-sm">
+                        Profile
+                    </button>
+                    <button @click="activeTab = 'items'" 
+                            :class="activeTab === 'items' ? 'border-primary text-primary' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
+                            class="py-2 px-1 border-b-2 font-medium text-sm">
+                        My Items
+                    </button>
+                    <button @click="activeTab = 'swaps'" 
+                            :class="activeTab === 'swaps' ? 'border-primary text-primary' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
+                            class="py-2 px-1 border-b-2 font-medium text-sm">
+                        Swaps
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Profile Tab -->
+            <div x-show="activeTab === 'profile'">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                        <h3 class="text-xl font-semibold mb-4">Profile Details</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Name</label>
+                                <p class="text-gray-700 dark:text-gray-300" x-text="currentUser.name"></p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Email</label>
+                                <p class="text-gray-700 dark:text-gray-300" x-text="currentUser.email"></p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Member Since</label>
+                                <p class="text-gray-700 dark:text-gray-300" x-text="currentUser.joinDate"></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                        <h3 class="text-xl font-semibold mb-4">Points Balance</h3>
+                        <div class="text-center">
+                            <div class="text-4xl font-bold text-primary mb-2" x-text="currentUser.points"></div>
+                            <p class="text-gray-600 dark:text-gray-400">Available Points</p>
+                            <div class="mt-4 text-sm text-gray-500 dark:text-gray-500">
+                                <p>• Earn 10 points for each item listed</p>
+                                <p>• Earn 5 points for successful swaps</p>
+                                <p>• Use points to redeem items</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- My Items Tab -->
+            <div x-show="activeTab === 'items'">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-semibold">My Listed Items</h3>
+                    <button @click="showListItemModal = true" 
+                            class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition">
+                        List New Item
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <template x-for="item in myItems" :key="item.id">
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+                            <div class="item-image h-48 w-full"></div>
+                            <div class="p-4">
+                                <h4 class="font-semibold mb-2" x-text="item.title"></h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-400 mb-2" x-text="item.category"></p>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-primary font-semibold" x-text="item.points + ' points'"></span>
+                                    <span class="text-xs px-2 py-1 rounded-full"
+                                          :class="item.status === 'Available' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'"
+                                          x-text="item.status"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Swaps Tab -->
+            <div x-show="activeTab === 'swaps'">
+                <h3 class="text-xl font-semibold mb-6">Swap History</h3>
+                <div class="space-y-4">
+                    <template x-for="swap in swaps" :key="swap.id">
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h4 class="font-semibold mb-2" x-text="swap.title"></h4>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-1" x-text="'With: ' + swap.partner"></p>
+                                    <p class="text-sm text-gray-500 dark:text-gray-500" x-text="'Date: ' + swap.date"></p>
+                                </div>
+                                <span class="px-3 py-1 text-sm rounded-full"
+                                      :class="swap.status === 'Completed' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'"
+                                      x-text="swap.status"></span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- Item Detail Page -->
+        <div x-show="currentView === 'item'" class="max-w-4xl mx-auto px-4 py-8">
+            <template x-if="selectedItem">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Image Gallery -->
+                    <div>
+                        <div class="https://www.pngarts.com/files/3/Clothing-PNG-Photo.png"></div>
+                        <div class="grid grid-cols-4 gap-2">
+                            <div class="item-image h-20 rounded cursor-pointer opacity-60 hover:opacity-100"></div>
+                            <div class="item-image h-20 rounded cursor-pointer opacity-60 hover:opacity-100"></div>
+                            <div class="item-image h-20 rounded cursor-pointer opacity-60 hover:opacity-100"></div>
+                            <div class="item-image h-20 rounded cursor-pointer opacity-60 hover:opacity-100"></div>
+                        </div>
+                    </div>
+
+                    <!-- Item Details -->
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                        <h1 class="text-3xl font-bold mb-4" x-text="selectedItem.title"></h1>
+                        <div class="space-y-3 mb-6">
+                            <div class="flex justify-between">
+                                <span class="font-medium">Category:</span>
+                                <span x-text="selectedItem.category"></span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="font-medium">Size:</span>
+                                <span x-text="selectedItem.size"></span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="font-medium">Brand:</span>
+                                <span x-text="selectedItem.brand"></span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="font-medium">Condition:</span>
+                                <span x-text="selectedItem.condition"></span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="font-medium">Points:</span>
+                                <span class="text-primary font-bold" x-text="selectedItem.points"></span>
+                            </div>
+                        </div>
+
+                        <div class="mb-6">
+                            <h3 class="font-semibold mb-2">Description</h3>
+                            <p class="text-gray-600 dark:text-gray-400" x-text="selectedItem.description"></p>
+                        </div>
+
+                        <div class="mb-6">
+                            <h3 class="font-semibold mb-2">Owner</h3>
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white font-bold">
+                                    <span x-text="selectedItem.owner.charAt(0)"></span>
+                                </div>
+                                <div>
+                                    <p class="font-medium" x-text="selectedItem.owner"></p>
+                                    <p class="text-sm text-gray-500">Member since 2023</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <template x-if="selectedItem.status === 'Available'">
+                            <div class="space-y-3">
+                                <button @click="initiateSwap()" 
+                                        class="w-full py-3 bg-primary text-white font-semibold rounded-lg hover:bg-primary-dark transition">
+                                    Request Swap
+                                </button>
+                                <button @click="redeemWithPoints()" 
+                                        :disabled="currentUser.points < selectedItem.points"
+                                        :class="currentUser.points >= selectedItem.points ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'"
+                                        class="w-full py-3 text-white font-semibold rounded-lg transition">
+                                    <span x-text="'Redeem with ' + selectedItem.points + ' Points'"></span>
+                                </button>
+                            </div>
+                        </template>
+                        <template x-if="selectedItem.status !== 'Available'">
+                            <div class="text-center py-4">
+                                <span class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-lg">
+                                    Item Not Available
+                                </span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </main>
+
+    <!-- List Item Modal -->
+    <div x-show="showListItemModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" @click.self="showListItemModal = false">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full max-h-screen overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold">List New Item</h3>
+                    <button @click="showListItemModal = false" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">✕</button>
+                </div>
+                <form @submit.prevent="listItem()">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Title</label>
+                            <input type="text" x-model="newItem.title" required
+                                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-base">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Category</label>
+                            <select x-model="newItem.category" required
+                                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-base">
+                                <option value="">Select Category</option>
+                                <option value="Tops">Tops</option>
+                                <option value="Bottoms">Bottoms</option>
+                                <option value="Dresses">Dresses</option>
+                                <option value="Outerwear">Outerwear</option>
+                                <option value="Accessories">Accessories</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Size</label>
+                            <select x-model="newItem.size" required
+                                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-base">
+                                <option value="">Select Size</option>
+                                <option value="XS">XS</option>
+                                <option value="S">S</option>
+                                <option value="M">M</option>
+                                <option value="L">L</option>
+                                <option value="XL">XL</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Brand</label>
+                            <input type="text" x-model="newItem.brand" required
+                                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-base">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Condition</label>
+                            <select x-model="newItem.condition" required
+                                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-base">
+                                <option value="">Select Condition</option>
+                                <option value="Like New">Like New</option>
+                                <option value="Excellent">Excellent</option>
+                                <option value="Good">Good</option>
+                                <option value="Fair">Fair</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Description</label>
+                            <textarea x-model="newItem.description" rows="3" required
+                                      class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-base"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Points Value</label>
+                            <input type="number" x-model="newItem.points" min="1" max="100" required
+                                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-700 text-base">
+                        </div>
+                    </div>
+                    <div class="flex space-x-3 mt-6">
+                        <button type="button" @click="showListItemModal = false" 
+                                class="flex-1 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                            Cancel
+                        </button>
+                        <button type="submit" 
+                                class="flex-1 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark">
+                            List Item
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Dark mode detection
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+
+        function reWearApp() {
+            return {
+                currentView: 'landing',
+                isLoggedIn: false,
+                currentUser: null,
+                showListItemModal: false,
+                carouselIndex: 0,
+                selectedItem: null,
+                
+                // Forms
+                loginForm: { email: '', password: '' },
+                signupForm: { name: '', email: '', password: '' },
+                newItem: { title: '', category: '', size: '', brand: '', condition: '', description: '', points: 20 },
+                
+                // Filters
+                filters: { category: '', size: '' },
+                
+                // Mock data
+                items: [
+                    { id: 1, title: 'Vintage Denim Jacket', category: 'Outerwear', size: 'M', brand: 'Levi\'s', condition: 'Excellent', points: 25, status: 'Available', owner: 'Sarah Johnson', description: 'Classic vintage denim jacket in excellent condition. Perfect for layering and adds a retro touch to any outfit.' },
+                    { id: 2, title: 'Floral Summer Dress', category: 'Dresses', size: 'S', brand: 'Zara', condition: 'Like New', points: 30, status: 'Available', owner: 'Emma Wilson', description: 'Beautiful floral print summer dress, worn only once. Light and airy fabric perfect for warm weather.' },
+                    { id: 3, title: 'Black Blazer', category: 'Outerwear', size: 'L', brand: 'H&M', condition: 'Good', points: 20, status: 'Available', owner: 'Michael Brown', description: 'Professional black blazer suitable for office wear or formal occasions. Some minor wear but still in good condition.' },
+                    { id: 4, title: 'Yoga Leggings', category: 'Bottoms', size: 'M', brand: 'Lululemon', condition: 'Excellent', points: 35, status: 'Available', owner: 'Lisa Chen', description: 'High-quality yoga leggings with four-way stretch. Perfect for workouts or casual wear.' },
+                    { id: 5, title: 'Silk Scarf', category: 'Accessories', size: 'One Size', brand: 'Hermès', condition: 'Like New', points: 45, status: 'Available', owner: 'Jennifer Davis', description: 'Luxury silk scarf with beautiful pattern. Can be worn around neck, in hair, or as a bag accessory.' },
+                    { id: 6, title: 'Cotton T-Shirt', category: 'Tops', size: 'L', brand: 'Uniqlo', condition: 'Good', points: 15, status: 'Available', owner: 'David Miller', description: 'Comfortable cotton t-shirt in navy blue. Basic wardrobe staple in good condition.' }
+                ],
+                
+                users: [
+                    { id: 1, name: 'John Doe', email: 'john@example.com', password: 'password', points: 75, joinDate: 'January 2024' }
+                ],
+                
+                myItems: [],
+                swaps: [],
+                
+                init() {
+                    // Initialize carousel
+                    setInterval(() => {
+                        this.nextCarousel();
+                    }, 5000);
+                },
+                
+                get featuredChunks() {
+                    const chunks = [];
+                    for (let i = 0; i < this.items.length; i += 3) {
+                        chunks.push(this.items.slice(i, i + 3));
+                    }
+                    return chunks;
+                },
+                
+                get filteredItems() {
+                    return this.items.filter(item => {
+                        return (!this.filters.category || item.category === this.filters.category) &&
+                               (!this.filters.size || item.size === this.filters.size);
+                    });
+                },
+                
+                nextCarousel() {
+                    this.carouselIndex = (this.carouselIndex + 1) % this.featuredChunks.length;
+                },
+                
+                prevCarousel() {
+                    this.carouselIndex = this.carouselIndex === 0 ? this.featuredChunks.length - 1 : this.carouselIndex - 1;
+                },
+                
+                applyFilters() {
+                    // Filters are applied automatically through computed property
+                },
+                
+                login() {
+                    const user = this.users.find(u => u.email === this.loginForm.email && u.password === this.loginForm.password);
+                    if (user) {
+                        this.isLoggedIn = true;
+                        this.currentUser = user;
+                        this.currentView = 'dashboard';
+                        this.loadUserData();
+                    } else {
+                        this.showCustomAlert('Invalid email or password');
+                    }
+                },
+                
+                signup() {
+                    const newUser = {
+                        id: this.users.length + 1,
+                        name: this.signupForm.name,
+                        email: this.signupForm.email,
+                        password: this.signupForm.password,
+                        points: 50, // Welcome bonus
+                        joinDate: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                    };
+                    this.users.push(newUser);
+                    this.isLoggedIn = true;
+                    this.currentUser = newUser;
+                    this.currentView = 'dashboard';
+                    this.loadUserData();
+                },
+                
+                logout() {
+                    this.isLoggedIn = false;
+                    this.currentUser = null;
+                    this.currentView = 'landing';
+                    this.myItems = [];
+                    this.swaps = [];
+                },
+                
+                loadUserData() {
+                    // Load user's items and swaps (mock data)
+                    this.myItems = [
+                        { id: 101, title: 'Navy Sweater', category: 'Tops', size: 'M', points: 22, status: 'Available' },
+                        { id: 102, title: 'Blue Jeans', category: 'Bottoms', size: 'L', points: 28, status: 'Pending Swap' }
+                    ];
+                    
+                    this.swaps = [
+                        { id: 201, title: 'Exchanged Red Dress for Blue Jacket', partner: 'Alice Smith', date: '2024-01-15', status: 'Completed' },
+                        { id: 202, title: 'Pending: Black Boots for White Sneakers', partner: 'Bob Johnson', date: '2024-01-20', status: 'In Progress' }
+                    ];
+                },
+                
+                viewItem(itemId) {
+                    this.selectedItem = this.items.find(item => item.id === itemId);
+                    this.currentView = 'item';
+                },
+                
+                listItem() {
+                    const item = {
+                        ...this.newItem,
+                        id: this.items.length + 1,
+                        status: 'Available',
+                        owner: this.currentUser.name
+                    };
+                    this.items.push(item);
+                    this.myItems.push(item);
+                    this.currentUser.points += 10; // Bonus for listing
+                    this.showListItemModal = false;
+                    this.newItem = { title: '', category: '', size: '', brand: '', condition: '', description: '', points: 20 };
+                    this.showCustomAlert('Item listed successfully! You earned 10 points.');
+                },
+                
+                initiateSwap() {
+                    this.showCustomAlert('Swap request sent! The owner will be notified.');
+                },
+                
+                redeemWithPoints() {
+                    if (this.currentUser.points >= this.selectedItem.points) {
+                        this.currentUser.points -= this.selectedItem.points;
+                        this.selectedItem.status = 'Redeemed';
+                        this.showCustomAlert('Item redeemed successfully!');
+                    }
+                },
+                
+                showCustomAlert(message) {
+                    // Create custom alert modal
+                    const modal = document.createElement('div');
+                    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+                    modal.innerHTML = `
+                        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg max-w-sm w-full mx-4">
+                            <p class="text-gray-700 dark:text-gray-300 mb-4">${message}</p>
+                            <div class="flex justify-end">
+                                <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-primary text-white hover:bg-primary-dark rounded">OK</button>
+                            </div>
+                        </div>
+                    `;
+                    document.body.appendChild(modal);
+                }
+            }
+        }
+    </script>
+</body>
+</html>

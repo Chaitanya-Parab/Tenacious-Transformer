@@ -1,2 +1,7 @@
-# Tenacious-Transformer
-ReWear – Community Clothing Exchange, a web-based platform that enables users to exchange unused clothing through direct swaps or a point-based redemption system.
+Team Name: Tenacious-Transformer
+Problem Statement: ReWear – Community Clothing Exchange
+
+Team Members:
+1. Chaitanya Shivram Parab - cparab02@gmail.com
+2. Bhargawi Sanjay Kavatkar - bhargawikavatkar@gmail.com
+3. Kamakshi Rajendra Keluskar - kamakshikeluskar@gmail.com

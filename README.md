@@ -1,4 +1,4 @@
-Team Name: Tenacious-Transformer
+
 Problem Statement: ReWear – Community Clothing Exchange
 
 Team Members:
